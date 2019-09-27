@@ -11,8 +11,10 @@ You can edit this file as you like.
     , "debug"
     , "effect"
     , "generics-rep"
+    , "numbers"
     , "ordered-collections"
     , "psci-support"
+    , "test-unit"
     ]
 , packages =
     ./packages.dhall
