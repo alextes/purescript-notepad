@@ -1,16 +1,20 @@
 module RatioFinder2 where
 
 import Prelude
-
 import Data.Array ((:))
-import Data.Array (foldl) as Array
-import Data.Either (Either)
+import Data.Array (foldl, null) as Array
+import Data.Either (Either(..))
+import Data.Foldable (oneOf, product) as Foldable
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Show (genericShow)
 import Data.Map (Map)
 import Data.Map (empty, insert, lookup) as Map
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect (Effect)
+import Effect.Ref (Ref)
+import Effect.Ref (new) as Ref
 
 -- Given a list of conversion rates (formatted in the language of your choice) as a collection of origin unit, destination, and multiplier, for example:
 --
@@ -54,31 +58,32 @@ givenConversions =
 data Node
   = Node LengthUnit (Array (Tuple Factor Node))
 
-derive instance genericNode :: Generic Node _
-
-derive instance eqNode :: Eq Node
-
-instance showNode :: Show Node where
-  show x = genericShow x
-
--- Node1 -> Node2
--- Node1 -> Node3
--- Building graph data is wat.
 allNodes :: Map LengthUnit Node
-allNodes = Array.foldl addNodeToMap Map.empty givenConversions
+allNodes = ?graphbuildingwat
 
 addNodeToMap :: Map LengthUnit Node -> Conversion -> Map LengthUnit Node
-addNodeToMap nodeMap { from, to, factor } =
-  let
-    toNode = case Map.lookup to nodeMap of
-      Nothing -> Node to []
-      Just node -> node
+addNodeToMap nodeMap { from, to, factor } = do
+  toNode <- case Map.lookup to nodeMap of
+    Nothing -> Ref.new $ Node to []
+    Just node -> Ref.new node
+  fromNode <- case Map.lookup from nodeMap of
+    Nothing -> pure $ Node from [ Tuple factor toNode ] :: Effect Node
+    Just (Node unit neighors) -> pure $ Node unit $ (Tuple factor toNode) : neighors
+  pure $ Map.insert from fromNode nodeMap
 
-    fromNode = case Map.lookup from nodeMap of
-      Nothing -> Node from [ Tuple factor toNode ]
-      Just (Node unit neighors) -> Node unit $ (Tuple factor toNode) : neighors
-  in
-    Map.insert from fromNode nodeMap
-
+-- Doesn't deal with loops yet, assumes acyclical graph
 depthFirstSearch :: LengthUnit -> LengthUnit -> Either String Factor
-depthFirstSearch startingUnit targetUnit = case Map.lookup startingUnit allNodes
+depthFirstSearch startingUnit targetUnit = case Map.lookup startingUnit allNodes of
+  Nothing -> Left $ "No node of unit " <> startingUnit <> " in graph"
+  Just startingNode -> case exploreNode [ 1.0 ] startingNode of
+    Nothing -> Left "No conversion path found"
+    Just factors -> factors # Foldable.product >>> Right
+    where
+    exploreNode :: Array Factor -> Node -> Maybe (Array Factor)
+    exploreNode factors (Node unit neighbors)
+      -- we found the target!
+      | unit == targetUnit = factors # Just
+      -- node is not the target, and there are no further neighbors to explore.
+      | Array.null neighbors = Nothing
+      -- we keep searching
+      | otherwise = Foldable.oneOf $ map (\(Tuple factor neighbor) -> exploreNode (factor : factors) neighbor) neighbors
