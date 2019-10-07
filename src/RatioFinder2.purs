@@ -59,17 +59,17 @@ data Node
   = Node LengthUnit (Array (Tuple Factor Node))
 
 allNodes :: Map LengthUnit Node
-allNodes = ?graphbuildingwat
+allNodes = mempty
 
-addNodeToMap :: Map LengthUnit Node -> Conversion -> Map LengthUnit Node
-addNodeToMap nodeMap { from, to, factor } = do
-  toNode <- case Map.lookup to nodeMap of
-    Nothing -> Ref.new $ Node to []
-    Just node -> Ref.new node
-  fromNode <- case Map.lookup from nodeMap of
-    Nothing -> pure $ Node from [ Tuple factor toNode ] :: Effect Node
-    Just (Node unit neighors) -> pure $ Node unit $ (Tuple factor toNode) : neighors
-  pure $ Map.insert from fromNode nodeMap
+-- addNodeToMap :: Map LengthUnit Node -> Conversion -> Map LengthUnit Node
+-- addNodeToMap nodeMap { from, to, factor } = do
+--   toNode <- case Map.lookup to nodeMap of
+--     Nothing -> Ref.new $ Node to []
+--     Just node -> Ref.new node
+--   fromNode <- case Map.lookup from nodeMap of
+--     Nothing -> pure $ Node from [ Tuple factor toNode ] :: Effect Node
+--     Just (Node unit neighors) -> pure $ Node unit $ (Tuple factor toNode) : neighors
+--   pure $ Map.insert from fromNode nodeMap
 
 -- Doesn't deal with loops yet, assumes acyclical graph
 depthFirstSearch :: LengthUnit -> LengthUnit -> Either String Factor
